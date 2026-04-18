@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIGOFFS智能推广平台 (AIPP) - 五大核心功能</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #f5f5f5;
+            width: 1200px;
+            margin: 0;
+            padding: 0;
+        }
+
+        .poster {
+            width: 1200px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            padding: 60px 80px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 56px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
+        }
+
+        .header .subtitle {
+            font-size: 28px;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+
+        .header .tagline {
+            font-size: 22px;
+            margin-top: 15px;
+            opacity: 0.9;
+            font-style: italic;
+        }
+
+        .feature-section {
+            background: white;
+            border-radius: 20px;
+            padding: 50px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 100%;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .feature-number {
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .feature-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-right: 100px;
+        }
+
+        .feature-icon {
+            font-size: 64px;
+            margin-right: 25px;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1));
+        }
+
+        .feature-title {
+            font-size: 42px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .feature-desc {
+            font-size: 22px;
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            padding-left: 10px;
+        }
+
+        .pain-solution-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 25px;
+        }
+
+        .pain-box, .solution-box {
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        .pain-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
+            border-left: 5px solid #ffc107;
+        }
+
+        .solution-box {
+            background: linear-gradient(135deg, #d4edda 0%, #b8e6c0 100%);
+            border-left: 5px solid #28a745;
+        }
+
+        .pain-box h4, .solution-box h4 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .pain-box h4 {
+            color: #856404;
+        }
+
+        .solution-box h4 {
+            color: #155724;
+        }
+
+        .pain-box ul, .solution-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .pain-box li, .solution-box li {
+            font-size: 19px;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .pain-box li::before {
+            content: "❌";
+            position: absolute;
+            left: 0;
+            font-size: 18px;
+        }
+
+        .solution-box li::before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+            font-size: 18px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 5px solid #2196f3;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 25px;
+        }
+
+        .highlight-box h4 {
+            font-size: 24px;
+            color: #0d47a1;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .highlight-box p {
+            font-size: 20px;
+            color: #1565c0;
+            line-height: 1.8;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 50px;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .footer h3 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .footer p {
+            font-size: 24px;
+            opacity: 0.95;
+            line-height: 1.6;
+        }
+
+        .value-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .value-item {
+            background: rgba(255,255,255,0.95);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .value-item .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .value-item h4 {
+            font-size: 22px;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .value-item p {
+            font-size: 18px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="poster">
+        <div class="header">
+            <h1>🚀 BIGOFFS智能推广平台</h1>
+            <div class="subtitle">AI驱动的全链路营销自动化解决方案</div>
+            <div class="tagline">让推广更简单，让营销更智能</div>
+        </div>
+
+        <!-- 功能1：运营日历 -->
+        <div class="feature-section">
+            <div class="feature-number">1</div>
+            <div class="feature-header">
+                <div class="feature-icon">📅</div>
+                <div class="feature-title">运营日历</div>
+            </div>
+            <div class="feature-desc">
+                完美对接商品部定期输出的运营日历，门店小推手无需进入邮箱打开邮件查询，进入平台即可清晰查看推广重点
+            </div>
+            <div class="pain-solution-grid">
+                <div class="pain-box">
+                    <h4>传统痛点</h4>
+                    <ul>
+                        <li>邮件查找繁琐，效率低下</li>
+                        <li>信息分散，容易遗漏</li>
+                        <li>无法快速定位推广重点</li>
+                        <li>跨部门信息同步困难</li>
+                    </ul>
+                </div>
+                <div class="solution-box">
+                    <h4>AIPP解决方案</h4>
+                    <ul>
+                        <li>一键查看所有运营日历</li>
+                        <li>推广重点一目了然</li>
+                        <li>自动同步商品部更新</li>
+                        <li>支持日历订阅和提醒</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box">
+                <h4>💡 核心价值</h4>
+                <p>门店推广人员节省80%的信息查找时间，推广计划执行效率提升3倍</p>
+            </div>
+        </div>
+
+        <!-- 功能2：模板社区 -->
+        <div class="feature-section">
+            <div class="feature-number">2</div>
+            <div class="feature-header">
+                <div class="feature-icon">🎨</div>
+                <div class="feature-title">模板社区</div>
+            </div>
+            <div class="feature-desc">
+                各个节日、节气、促销日，推广同学无需到处找模板，且AI生成的模板无版权风险
+            </div>
+            <div class="pain-solution-grid">
+                <div class="pain-box">
+                    <h4>传统痛点</h4>
+                    <ul>
+                        <li>模板资源分散难以查找</li>
+                        <li>版权风险难以把控</li>
+                        <li>模板质量参差不齐</li>
+                        <li>节日素材准备不及时</li>
+                    </ul>
+                </div>
+                <div class="solution-box">
+                    <h4>AIPP解决方案</h4>
+                    <ul>
+                        <li>海量AI生成模板库</li>
+                        <li>100%无版权风险</li>
+                        <li>按节日/节气智能分类</li>
+                        <li>一键套用快速出图</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box">
+                <h4>💡 核心价值</h4>
+                <p>覆盖全年所有营销节点，推广素材准备时间从2天缩短至10分钟，零版权风险</p>
+            </div>
+        </div>
+
+        <!-- 功能3：AI换装 -->
+        <div class="feature-section">
+            <div class="feature-number">3</div>
+            <div class="feature-header">
+                <div class="feature-icon">👗</div>
+                <div class="feature-title">AI换装</div>
+            </div>
+            <div class="feature-desc">
+                可将上传的实拍图、白底图、上身图一键换装，且可以随意改变画面风格，并可以"一键打BIGOFFS logo"，帮助推广同学轻松拿捏社群推广
+            </div>
+            <div class="pain-solution-grid">
+                <div class="pain-box">
+                    <h4>传统痛点</h4>
+                    <ul>
+                        <li>专业修图成本高昂</li>
+                        <li>场景拍摄耗时费力</li>
+                        <li>风格调整需要重拍</li>
+                        <li>品牌logo添加繁琐</li>
+                    </ul>
+                </div>
+                <div class="solution-box">
+                    <h4>AIPP解决方案</h4>
+                    <ul>
+                        <li>AI一键智能换装</li>
+                        <li>多种风格随意切换</li>
+                        <li>自动添加品牌logo</li>
+                        <li>秒级生成专业效果</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box">
+                <h4>💡 核心价值</h4>
+                <p>单张图片处理成本从50元降至0元，处理时间从30分钟缩短至10秒，社群推广素材产出效率提升100倍</p>
+            </div>
+        </div>
+
+        <!-- 功能4：AI图片设计 -->
+        <div class="feature-section">
+            <div class="feature-number">4</div>
+            <div class="feature-header">
+                <div class="feature-icon">🖼️</div>
+                <div class="feature-title">AI图片设计</div>
+            </div>
+            <div class="feature-desc">
+                运营同学仅输入提示词，AI即可输出相应图片，无需专业设计技能
+            </div>
+            <div class="pain-solution-grid">
+                <div class="pain-box">
+                    <h4>传统痛点</h4>
+                    <ul>
+                        <li>依赖专业设计师资源</li>
+                        <li>设计周期长影响效率</li>
+                        <li>沟通成本高易出错</li>
+                        <li>修改迭代耗时费力</li>
+                    </ul>
+                </div>
+                <div class="solution-box">
+                    <h4>AIPP解决方案</h4>
+                    <ul>
+                        <li>文字描述即可生成图片</li>
+                        <li>秒级输出专业设计</li>
+                        <li>无限次修改零成本</li>
+                        <li>多版本快速对比选择</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box">
+                <h4>💡 核心价值</h4>
+                <p>运营人员无需设计技能即可独立完成图片创作，设计需求响应时间从2天缩短至1分钟</p>
+            </div>
+        </div>
+
+        <!-- 功能5：我的图库 -->
+        <div class="feature-section">
+            <div class="feature-number">5</div>
+            <div class="feature-header">
+                <div class="feature-icon">📚</div>
+                <div class="feature-title">我的图库</div>
+            </div>
+            <div class="feature-desc">
+                轻松管理操作的图片内容，支持图片一键下载、一键打标等常用功能
+            </div>
+            <div class="pain-solution-grid">
+                <div class="pain-box">
+                    <h4>传统痛点</h4>
+                    <ul>
+                        <li>素材散落各处难管理</li>
+                        <li>查找历史素材费时</li>
+                        <li>团队协作共享困难</li>
+                        <li>素材分类整理繁琐</li>
+                    </ul>
+                </div>
+                <div class="solution-box">
+                    <h4>AIPP解决方案</h4>
+                    <ul>
+                        <li>集中管理所有素材</li>
+                        <li>智能标签快速检索</li>
+                        <li>一键批量下载导出</li>
+                        <li>团队共享实时同步</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box">
+                <h4>💡 核心价值</h4>
+                <p>素材管理效率提升10倍，查找时间从10分钟缩短至10秒，团队协作效率提升5倍</p>
+            </div>
+        </div>
+
+        <!-- 底部总结 -->
+        <div class="footer">
+            <h3>🎯 AIPP平台核心优势</h3>
+            <div class="value-grid">
+                <div class="value-item">
+                    <div class="icon">⚡</div>
+                    <h4>效率提升</h4>
+                    <p>推广工作效率提升10倍</p>
+                </div>
+                <div class="value-item">
+                    <div class="icon">💰</div>
+                    <h4>成本降低</h4>
+                    <p>运营成本降低70%</p>
+                </div>
+                <div class="value-item">
+                    <div class="icon">🎨</div>
+                    <h4>零门槛</h4>
+                    <p>无需专业技能即可上手</p>
+                </div>
+            </div>
+            <p style="margin-top: 30px; font-size: 28px; font-weight: bold;">
+                让AI成为您的推广助手，开启智能营销新时代
+            </p>
+        </div>
+    </div>
+</body>
+</html>

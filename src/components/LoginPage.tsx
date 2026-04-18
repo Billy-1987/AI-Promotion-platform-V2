@@ -34,7 +34,7 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-white mb-2">智能推广平台</h1>
           <p className="text-zinc-400 text-base mb-6">AI 驱动的推广内容生成系统</p>
           <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
-            {['运营日历', 'AI 换装', '背景替换', '模板社区', '图库管理'].map(f => (
+            {['运营日历', '模板社区', 'AI 换装', 'AI 图片设计', '我的图库'].map(f => (
               <span key={f} className="px-3 py-1 bg-indigo-900/40 text-indigo-300 text-sm rounded-full border border-indigo-800/50">
                 {f}
               </span>
