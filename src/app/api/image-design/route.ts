@@ -20,6 +20,36 @@ async function generateImage(parts: ContentPart[], model: string): Promise<strin
   return images?.[0]?.image_url?.url ?? null
 }
 
+interface TextOverlay {
+  content: string
+  fontSize: number
+  color: string
+  fontFamily: string
+  x: number
+  y: number
+}
+
+function extractTexts(prompt: string): TextOverlay[] {
+  const texts: TextOverlay[] = []
+  const defaultFont = '"PingFang SC", "Microsoft YaHei", sans-serif'
+
+  const quotedRe = /["""''']([^"""''']{1,30})["""''']/g
+  let m: RegExpExecArray | null
+  while ((m = quotedRe.exec(prompt)) !== null) {
+    texts.push({ content: m[1], fontSize: 0.07, color: '#ffffff', fontFamily: defaultFont, x: 0.5, y: 0.5 })
+  }
+
+  const explicitRe = /(?:写上|写着|文字[：:]\s*|标题[：:]\s*|slogan[：:]\s*)([^\s，,。.！!？?]{1,30})/gi
+  while ((m = explicitRe.exec(prompt)) !== null) {
+    const content = m[1].trim()
+    if (!texts.find(t => t.content === content)) {
+      texts.push({ content, fontSize: 0.07, color: '#ffffff', fontFamily: defaultFont, x: 0.5, y: 0.5 })
+    }
+  }
+
+  return texts
+}
+
 export async function POST(req: NextRequest) {
   const { prompt, negativePrompt, style, ratio, count, steps, cfgScale, seed, sampler } = await req.json()
 
@@ -37,7 +67,9 @@ export async function POST(req: NextRequest) {
     watercolor: 'watercolor painting, soft colors, artistic, flowing paint',
   }
 
-  const fullPrompt = `${prompt}. ${stylePrompts[style] || stylePrompts.realistic}. Image dimensions: ${width}x${height}.`
+  const texts = extractTexts(prompt)
+
+  const fullPrompt = `${prompt}. ${stylePrompts[style] || stylePrompts.realistic}. Image dimensions: ${width}x${height}. IMPORTANT: Do NOT render any text, letters, words, or typography in the image — leave any text areas as clean background.`
   const finalPrompt = negativePrompt
     ? `${fullPrompt}\n\nAvoid: ${negativePrompt}`
     : fullPrompt
@@ -66,5 +98,5 @@ export async function POST(req: NextRequest) {
     }))
     .filter(img => img.url !== null)
 
-  return NextResponse.json({ images })
+  return NextResponse.json({ images, texts })
 }

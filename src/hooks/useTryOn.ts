@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { TryOnState, TryOnResult, StyleTag, GeminiAnalysis } from '@/types'
-import { analyzeClothing, suggestBackgrounds, generateTryOn } from '@/lib/mockAI'
+import { TryOnState, TryOnResult, StyleTag } from '@/types'
+import { suggestBackgrounds, generateTryOn } from '@/lib/mockAI'
 
 export function useTryOn() {
   const [state, setState] = useState<TryOnState>({
@@ -24,7 +24,7 @@ export function useTryOn() {
     const previewUrl = URL.createObjectURL(file)
     setState(prev => ({
       ...prev,
-      status: 'detecting',
+      status: 'processing',
       clothingFile: file,
       clothingPreviewUrl: previewUrl,
       analysis: null,
@@ -32,33 +32,47 @@ export function useTryOn() {
       tryOnResult: null,
     }))
 
-    let analysis: GeminiAnalysis | null = null
-    let style: StyleTag = 'womenswear'
-    let productCategory: 'clothing' | 'shoes' = 'clothing'
-
-    try {
-      analysis = await analyzeClothing(file)
-      style = analysis.style
-      productCategory = analysis.productCategory ?? 'clothing'
-    } catch {
-      const tags: StyleTag[] = ['sport', 'outdoor', 'menswear', 'womenswear', 'kids', 'trendy', 'vintage', 'workwear']
-      style = tags[Math.floor(Math.random() * tags.length)]
-    }
-
-    const backgrounds = suggestBackgrounds(style, productCategory)
+    // Generate immediately with default style, API will analyze in parallel
+    const defaultStyle: StyleTag = 'womenswear'
+    const defaultCategory: 'clothing' | 'shoes' = 'clothing'
+    const backgrounds = suggestBackgrounds(defaultStyle, defaultCategory)
     setSuggestedBackgrounds(backgrounds)
 
     setState(prev => ({
       ...prev,
-      status: 'processing',
-      detectedStyle: style,
+      detectedStyle: defaultStyle,
       selectedBackground: backgrounds[0],
-      analysis,
     }))
 
     try {
-      const result: TryOnResult = await generateTryOn(file, backgrounds[0], null, style, productCategory)
-      setState(prev => ({ ...prev, status: 'result', resultUrl: result.previewUrl, tryOnResult: result }))
+      const result: TryOnResult = await generateTryOn(file, backgrounds[0], null, null, undefined)
+
+      // Extract analyzed style/category from result
+      const analyzedStyle = (result as any).analyzeData?.style ?? defaultStyle
+      const analyzedCategory = (result as any).analyzeData?.productCategory ?? defaultCategory
+
+      // Update backgrounds if style changed
+      if (analyzedStyle !== defaultStyle || analyzedCategory !== defaultCategory) {
+        const newBackgrounds = suggestBackgrounds(analyzedStyle, analyzedCategory)
+        setSuggestedBackgrounds(newBackgrounds)
+      }
+
+      setState(prev => ({
+        ...prev,
+        status: 'result',
+        resultUrl: result.previewUrl,
+        tryOnResult: result,
+        detectedStyle: analyzedStyle,
+        analysis: (result as any).analyzeData ? {
+          style: analyzedStyle,
+          productCategory: analyzedCategory,
+          colors: (result as any).analyzeData.colors ?? [],
+          category: '',
+          keywords: (result as any).analyzeData.keywords ?? [],
+          backgroundSuggestion: '',
+          productDescription: result.description ?? '',
+        } : null,
+      }))
     } catch {
       setState(prev => ({ ...prev, status: 'ready' }))
     }

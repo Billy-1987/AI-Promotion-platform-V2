@@ -72,83 +72,87 @@ async function generateImage(parts: ContentPart[], model: string): Promise<strin
   return images?.[0]?.image_url?.url ?? null
 }
 
+const ANALYZE_PROMPT = `Analyze this product image. Return pure JSON only (no markdown):
+{"style":"sport|outdoor|menswear|womenswear|kids|trendy|vintage|workwear","productCategory":"shoes|clothing","colors":["color1"],"keywords":["kw1","kw2"]}`
+
 export async function POST(req: NextRequest) {
-  const { clothingBase64, clothingMime, style, backgroundId, productCategory } = await req.json()
+  const { clothingBase64, clothingMime, style: inputStyle, backgroundId, productCategory: inputCategory, skipAnalyze } = await req.json()
 
   if (!clothingBase64) {
     return NextResponse.json({ error: 'No clothing image provided' }, { status: 400 })
   }
-
-  const isShoes = productCategory === 'shoes'
-  const styleLabel = STYLE_LABELS[style] ?? 'fashion'
-  const styleZhLabel = STYLE_ZH[style] ?? '时尚'
-  const bgScene = BG_SCENES[backgroundId] ?? 'a clean studio with soft white lighting'
-  const modelDesc = MODEL_BY_STYLE[style] ?? 'a handsome young Caucasian model (age 25-30)'
 
   const clothingPart: ContentPart = {
     type: 'image_url',
     image_url: { url: `data:${clothingMime ?? 'image/jpeg'};base64,${clothingBase64}` },
   }
 
+  // If style/category already known (re-generate flow), skip analyze
+  let resolvedStyle = inputStyle ?? 'womenswear'
+  let resolvedCategory = inputCategory ?? 'clothing'
+  let analyzeData: Record<string, unknown> | null = null
+
+  const analyzePromise = skipAnalyze
+    ? Promise.resolve(null)
+    : client.chat.completions.create({
+        model: 'google/gemini-2.5-flash',
+        messages: [{ role: 'user', content: [clothingPart, { type: 'text', text: ANALYZE_PROMPT }] as OpenAI.Chat.ChatCompletionContentPart[] }],
+      }).then(res => {
+        const text = res.choices[0]?.message?.content ?? ''
+        try {
+          const json = JSON.parse(text.trim())
+          resolvedStyle = json.style ?? resolvedStyle
+          resolvedCategory = json.productCategory ?? resolvedCategory
+          analyzeData = json
+        } catch {
+          const m = text.match(/\{[\s\S]*?\}/)
+          if (m) {
+            try {
+              const json = JSON.parse(m[0])
+              resolvedStyle = json.style ?? resolvedStyle
+              resolvedCategory = json.productCategory ?? resolvedCategory
+              analyzeData = json
+            } catch { /* keep defaults */ }
+          }
+        }
+        return analyzeData
+      }).catch(() => null)
+
+  // Use inputCategory if known (re-generate), otherwise default to clothing for prompt
+  // The image model will identify the product type itself from the image
+  const isShoes = inputCategory === 'shoes'
+  const styleLabel = STYLE_LABELS[inputStyle ?? 'womenswear'] ?? 'fashion'
+  const styleZhLabel = STYLE_ZH[inputStyle ?? 'womenswear'] ?? '时尚'
+  const bgScene = BG_SCENES[backgroundId] ?? 'a clean studio with soft white lighting'
+  const modelDesc = MODEL_BY_STYLE[inputStyle ?? 'womenswear'] ?? 'a handsome young Caucasian model (age 25-30)'
+
   const imagePrompt = isShoes
-    ? `You are a professional product photographer AI specializing in footwear.
-
-TASK: Create a stunning shoe product photo that highlights the shoe's design and its natural wearing context.
-
-Step 1 — Extract shoe details: Identify the exact shoe design, colors, materials, sole, laces, branding, and style from the input image.
-
-Step 2 — NO MODEL NEEDED: Do NOT include any person, legs, or body parts. Focus entirely on the shoes.
-
-Step 3 — Scene composition: Place the shoes in this scene: ${bgScene}. Options:
-  - Shoes displayed on a clean surface (wood floor, concrete, grass, etc.) matching the scene
-  - One or both shoes arranged naturally, slightly angled for depth
-  - Optional: lifestyle props that match the shoe style (e.g. gym bag for sport shoes, leaves for outdoor boots)
-
-Step 4 — Lighting: Professional product photography lighting. Highlight the shoe's texture, material, and design details. Soft shadows for depth.
-
-Step 5 — Final output: High-quality commercial product photo. Clean, aspirational, brand-campaign quality. The shoes must be the clear hero of the image.`
-    : `You are a professional fashion photographer AI.
-
-CRITICAL: The input image may contain a person. You MUST completely ignore any person/face/body in the input image. Do NOT use their appearance as reference in any way.
-
-Step 1 — Extract clothing only: Identify the clothing item's exact design, colors, patterns, fabric texture, cut, and style details. Ignore any human in the image.
-
-Step 2 — Generate a brand-new virtual model: ${modelDesc}.
-  - Western/European appearance, NOT Asian.
-  - Age strictly 25-30 years old, youthful and attractive.
-  - Male styles: handsome Caucasian man, strong jawline, bright confident smile, athletic build.
-  - Female styles: beautiful European woman, slender elegant figure, sweet charming smile, glowing skin.
-  - NEVER generate Asian, middle-aged, or elderly models.
-
-Step 3 — Dress the model: The virtual model wears EXACTLY the extracted clothing item. Preserve every garment detail accurately — colors, patterns, cut, fabric.
-
-Step 4 — Background: Place the model in this specific scene: ${bgScene}. The background must be clearly visible and immersive. Lighting and shadows must match the scene naturally.
-
-Step 5 — Final output: Photorealistic, high-quality ${styleLabel} fashion editorial photo. Full body or 3/4 shot. Professional fashion campaign quality.`
+    ? `Professional shoe product photo. Extract exact shoe design/colors/materials from input. NO person or body parts. Place shoes on: ${bgScene}. Arrange naturally, slightly angled. Professional lighting, soft shadows. High-quality commercial product photo.`
+    : `Professional ${styleLabel} fashion photo. IGNORE any person in input image — extract clothing design/colors/patterns/cut only. New virtual model: ${modelDesc}, Western/European, age 25-30, NOT Asian. Model wears EXACTLY the extracted clothing. Background: ${bgScene}. Photorealistic full-body or 3/4 shot, fashion editorial quality.`
 
   const textPrompt = isShoes
     ? `分析这双鞋的设计特点、材质工艺和适合场景。返回纯JSON（无markdown代码块）：{"description":"100字内专业鞋款描述，突出设计亮点和穿着场景","fitScore":85,"styleMatch":"风格特点","occasion":"适合场合"}`
     : `分析这件${styleZhLabel}服装的上身效果、版型特点和适合人群。返回纯JSON（无markdown代码块）：{"description":"100字内专业上身效果描述","fitScore":85,"styleMatch":"风格特点","occasion":"适合场合"}`
 
   const [imageRes, textRes] = await Promise.allSettled([
-    (async () => {
-      let url = await generateImage(
+    Promise.race([
+      generateImage(
         [clothingPart, { type: 'text', text: imagePrompt }],
         'google/gemini-2.5-flash-image',
-      )
-      if (!url) {
-        url = await generateImage(
-          [clothingPart, { type: 'text', text: imagePrompt }],
-          'google/gemini-3.1-flash-image-preview',
-        )
-      }
-      return url
-    })(),
+      ),
+      generateImage(
+        [clothingPart, { type: 'text', text: imagePrompt }],
+        'google/gemini-3.1-flash-image-preview',
+      ),
+    ]),
     client.chat.completions.create({
       model: 'google/gemini-2.5-flash',
       messages: [{ role: 'user', content: [clothingPart, { type: 'text', text: textPrompt }] as OpenAI.Chat.ChatCompletionContentPart[] }],
     }),
   ])
+
+  // Wait for analyze to finish (it was running in parallel)
+  await analyzePromise
 
   const generatedImageUrl = imageRes.status === 'fulfilled' ? imageRes.value : null
 
@@ -167,5 +171,5 @@ Step 5 — Final output: Photorealistic, high-quality ${styleLabel} fashion edit
     }
   }
 
-  return NextResponse.json({ ...analysis, generatedImageUrl })
+  return NextResponse.json({ ...analysis, generatedImageUrl, analyzeData })
 }

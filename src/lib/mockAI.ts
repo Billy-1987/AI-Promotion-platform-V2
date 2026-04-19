@@ -51,6 +51,7 @@ export async function generateTryOn(
   modelFile?: File | null,
   style?: StyleTag | null,
   productCategory?: 'clothing' | 'shoes',
+  skipAnalyze?: boolean,
 ): Promise<TryOnResult> {
   const clothingBase64 = clothingFile ? await fileToBase64(clothingFile) : undefined
   const modelBase64 = modelFile ? await fileToBase64(modelFile) : undefined
@@ -63,9 +64,10 @@ export async function generateTryOn(
       clothingMime: clothingFile?.type,
       modelBase64,
       modelMime: modelFile?.type,
-      style: style ?? 'womenswear',
+      style: style ?? undefined,
       backgroundId,
-      productCategory: productCategory ?? 'clothing',
+      productCategory: productCategory ?? undefined,
+      skipAnalyze: skipAnalyze ?? (style != null && productCategory != null),
     }),
   })
   if (!res.ok) throw new Error('Try-on generation failed')

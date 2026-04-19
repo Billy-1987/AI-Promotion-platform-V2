@@ -82,10 +82,12 @@ function CalendarContent() {
     URL.revokeObjectURL(url)
   }
 
+  const currentWeek = getCurrentWeek()
+
   return (
     <div className="min-h-screen bg-zinc-900 text-white">
       <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Logo />
           <div>
             <h1 className="text-lg font-bold text-white">智能推广平台</h1>
@@ -217,8 +219,8 @@ function CalendarContent() {
           </div>
         ) : (
           <div className="space-y-4">
-            {meta.summary?.map((entry) => (
-              <WeekCard key={entry.week} entry={entry} />
+            {meta.summary?.map((entry, idx) => (
+              <WeekCard key={entry.week} entry={entry} currentWeek={idx === 0 ? currentWeek : undefined} />
             ))}
           </div>
         )}
@@ -242,25 +244,40 @@ const BRAND_COLORS = [
   { bg: 'bg-fuchsia-900/50', border: 'border-fuchsia-700', text: 'text-fuchsia-200', badge: 'bg-fuchsia-700 text-fuchsia-100' },
 ]
 
-function WeekCard({ entry }: { entry: WeekEntry }) {
+function WeekCard({ entry, currentWeek }: { entry: WeekEntry; currentWeek?: string }) {
   return (
-    <div className="bg-zinc-800 rounded-2xl overflow-hidden border border-zinc-700">
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-zinc-700">
-        <span className="px-3 py-1 bg-indigo-600 text-white text-sm font-bold rounded-lg">{entry.week}</span>
-        <span className="text-zinc-400 text-sm">{entry.month} 月</span>
-        <span className="text-white font-semibold text-base flex-1">{entry.title}</span>
-        <span className="text-zinc-500 text-sm">{entry.brands.length} 个品牌 · {entry.brands.reduce((s, b) => s + b.count, 0)} 款</span>
+    <div className="flex gap-3 items-start">
+      {/* 当前周标签 */}
+      <div className="w-16 shrink-0 pt-3 flex flex-col items-center gap-1">
+        {currentWeek && (
+          <>
+            <span className="text-xs text-zinc-500">当前</span>
+            <span className="px-2 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold rounded-lg text-center">
+              {currentWeek}
+            </span>
+          </>
+        )}
       </div>
-      <div className="px-6 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {entry.brands.map((b, i) => {
-          const c = BRAND_COLORS[i % BRAND_COLORS.length]
-          return (
-            <div key={b.name} className={`flex items-center justify-between ${c.bg} border ${c.border} rounded-lg px-3 py-2`}>
-              <span className={`text-sm font-medium truncate ${c.text}`}>{b.name}</span>
-              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded shrink-0 ${c.badge}`}>{b.count} 款</span>
-            </div>
-          )
-        })}
+
+      {/* 卡片主体 */}
+      <div className="flex-1 bg-zinc-800 rounded-2xl overflow-hidden border border-zinc-700">
+        <div className="flex items-center gap-4 px-6 py-4 border-b border-zinc-700">
+          <span className="px-3 py-1 bg-indigo-600 text-white text-sm font-bold rounded-lg">{entry.week}</span>
+          <span className="text-zinc-400 text-sm">{entry.month} 月</span>
+          <span className="text-white font-semibold text-base flex-1">{entry.title}</span>
+          <span className="text-zinc-500 text-sm">{entry.brands.length} 个品牌 · {entry.brands.reduce((s, b) => s + b.count, 0)} 款</span>
+        </div>
+        <div className="px-6 py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {entry.brands.map((b, i) => {
+            const c = BRAND_COLORS[i % BRAND_COLORS.length]
+            return (
+              <div key={b.name} className={`flex items-center justify-between ${c.bg} border ${c.border} rounded-lg px-3 py-2`}>
+                <span className={`text-sm font-medium truncate ${c.text}`}>{b.name}</span>
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded shrink-0 ${c.badge}`}>{b.count} 款</span>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -268,4 +285,25 @@ function WeekCard({ entry }: { entry: WeekEntry }) {
 
 export default function CalendarPage() {
   return <AuthGuard><CalendarContent /></AuthGuard>
+}
+
+function getCurrentWeek(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const shortYear = year % 100 // 2026 → 26
+
+  // 本年第一天
+  const jan1 = new Date(year, 0, 1)
+  // 本年第一个周一（ISO 周从周一开始）
+  const dayOfWeek = jan1.getDay() // 0=周日, 1=周一...
+  const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek
+  const firstMonday = new Date(jan1)
+  firstMonday.setDate(jan1.getDate() + daysToMonday)
+
+  // 今天距第一个周一的天数
+  const diffMs = now.getTime() - firstMonday.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  const weekNum = diffDays < 0 ? 1 : Math.floor(diffDays / 7) + 1
+
+  return `${shortYear}W${weekNum}`
 }
