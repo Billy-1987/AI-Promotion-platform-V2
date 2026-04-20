@@ -248,11 +248,11 @@ function WeekCard({ entry, currentWeek }: { entry: WeekEntry; currentWeek?: stri
   return (
     <div className="flex gap-3 items-start">
       {/* 当前周标签 */}
-      <div className="w-16 shrink-0 pt-3 flex flex-col items-center gap-1">
+      <div className="w-20 shrink-0 pt-3 flex flex-col items-center gap-1.5">
         {currentWeek && (
           <>
-            <span className="text-xs text-zinc-500">当前</span>
-            <span className="px-2 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold rounded-lg text-center">
+            <span className="text-sm text-zinc-400 font-medium">当前</span>
+            <span className="px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-base font-bold rounded-xl text-center">
               {currentWeek}
             </span>
           </>

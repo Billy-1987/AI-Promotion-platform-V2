@@ -40,14 +40,22 @@ interface TextOverlay {
 }
 
 const TEXT_FONTS = [
-  { value: '"PingFang SC", "Microsoft YaHei", sans-serif', label: '黑体' },
-  { value: '"STKaiti", "KaiTi", serif',                    label: '楷体' },
-  { value: '"STSong", "SimSun", serif',                    label: '宋体' },
-  { value: '"STXingkai", "华文行楷", cursive',              label: '行楷' },
+  { value: '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif', label: '黑体',    preview: '永' },
+  { value: '"STKaiti", "KaiTi", "Noto Serif SC", serif',                   label: '楷体',    preview: '永' },
+  { value: '"STSong", "SimSun", "Noto Serif SC", serif',                   label: '宋体',    preview: '永' },
+  { value: '"Noto Sans SC", sans-serif',                                    label: '思源黑体', preview: '永' },
+  { value: '"Noto Serif SC", serif',                                        label: '思源宋体', preview: '永' },
+  { value: '"ZCOOL XiaoWei", serif',                                        label: '站酷小薇', preview: '永' },
+  { value: '"ZCOOL QingKe HuangYou", cursive',                              label: '站酷庆科', preview: '永' },
+  { value: '"Ma Shan Zheng", cursive',                                      label: '马善政楷', preview: '永' },
+  { value: '"Zhi Mang Xing", cursive',                                      label: '志莽行书', preview: '永' },
+  { value: '"Long Cang", cursive',                                          label: '龙藏体',  preview: '永' },
 ]
 const TEXT_COLORS = ['#ffffff', '#000000', '#FFD700', '#FF4444', '#00CFFF']
 const FONT_SIZES  = [0.03, 0.05, 0.07, 0.10]
 const FONT_SIZE_LABELS = ['小', '中', '大', '特大']
+
+// ── 无子组件，直接在主组件内联渲染文字 overlay ──────────────────
 
 export default function ImageDesignStudio() {
   const { user, logout } = useAuth()
@@ -86,8 +94,8 @@ export default function ImageDesignStudio() {
     x: 0.5,
     y: 0.5,
   })
-  const [draggingTextIdx, setDraggingTextIdx] = useState<number | null>(null)
-  const dragOffsetRef = useRef({ dx: 0, dy: 0 })
+  const [selectedTextIdx, setSelectedTextIdx] = useState<number | null>(null)
+  const draggingTextRef = useRef<{ idx: number; startX: number; startY: number; origX: number; origY: number } | null>(null)
 
   async function handleGenerate() {
     if (!prompt.trim()) return
@@ -244,95 +252,96 @@ export default function ImageDesignStudio() {
   function updateLogoPos(clientX: number, clientY: number) {
     const el = previewAreaRef.current
     if (!el) return
-    const rect = el.getBoundingClientRect()
-    let x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    let y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+    const r = el.getBoundingClientRect()
+    let x = Math.max(0, Math.min(1, (clientX - r.left) / r.width))
+    let y = Math.max(0, Math.min(1, (clientY - r.top)  / r.height))
     if (Math.abs(x - 0.5) < 0.03) x = 0.5
     if (Math.abs(y - 0.5) < 0.03) y = 0.5
     setLogoPos({ x, y })
   }
 
-  // ── Text drag ──────────────────────────────────────────────────
+  // ── Text drag — global listeners so pointer can leave the element ──
   function startTextDrag(e: React.MouseEvent | React.TouchEvent, idx: number) {
     e.stopPropagation()
+    e.preventDefault()
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-    const el = previewAreaRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
+    const container = previewAreaRef.current
+    if (!container) return
     const t = textOverlays[idx]
-    dragOffsetRef.current = {
-      dx: clientX / rect.width - t.x,
-      dy: clientY / rect.height - t.y,
+    draggingTextRef.current = {
+      idx,
+      startX: clientX,
+      startY: clientY,
+      origX: t.x,
+      origY: t.y,
     }
-    setDraggingTextIdx(idx)
+    setSelectedTextIdx(idx)
+
+    function onMove(ev: MouseEvent | TouchEvent) {
+      ev.preventDefault()
+      const cx = 'touches' in ev ? (ev as TouchEvent).touches[0].clientX : (ev as MouseEvent).clientX
+      const cy = 'touches' in ev ? (ev as TouchEvent).touches[0].clientY : (ev as MouseEvent).clientY
+      const ref = draggingTextRef.current
+      if (!ref) return
+      const rect = previewAreaRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const nx = Math.max(0.02, Math.min(0.98, ref.origX + (cx - ref.startX) / rect.width))
+      const ny = Math.max(0.02, Math.min(0.98, ref.origY + (cy - ref.startY) / rect.height))
+      setTextOverlays(prev => prev.map((t2, i) => i === ref.idx ? { ...t2, x: nx, y: ny } : t2))
+    }
+
+    function onUp() {
+      draggingTextRef.current = null
+      setTextOverlays(prev => { redrawCanvas(prev); return prev })
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
   }
 
-  function moveTextDrag(clientX: number, clientY: number) {
-    if (draggingTextIdx === null) return
-    const el = previewAreaRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    const x = Math.max(0.02, Math.min(0.98, clientX / rect.width - dragOffsetRef.current.dx))
-    const y = Math.max(0.02, Math.min(0.98, clientY / rect.height - dragOffsetRef.current.dy))
-    const updated = textOverlays.map((t, i) => i === draggingTextIdx ? { ...t, x, y } : t)
-    setTextOverlays(updated)
-  }
-
-  function endTextDrag(texts?: TextOverlay[]) {
-    if (draggingTextIdx === null) return
-    setDraggingTextIdx(null)
-    redrawCanvas(texts ?? textOverlays)
-  }
-
-  // ── Unified pointer handlers for preview area ──────────────────
+  // ── Preview area handlers (Logo only — text has its own listeners) ──
   function handleMouseDown(e: React.MouseEvent) {
-    if (draggingTextIdx !== null) return
+    if (draggingTextRef.current) return
     if (withLogo) { setDragging(true); updateLogoPos(e.clientX, e.clientY) }
   }
   function handleMouseMove(e: React.MouseEvent) {
-    if (draggingTextIdx !== null) { moveTextDrag(e.clientX, e.clientY); return }
     if (dragging) updateLogoPos(e.clientX, e.clientY)
   }
-  function handleMouseUp(e: React.MouseEvent) {
-    if (draggingTextIdx !== null) {
-      const el = previewAreaRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const x = Math.max(0.02, Math.min(0.98, e.clientX / rect.width - dragOffsetRef.current.dx))
-      const y = Math.max(0.02, Math.min(0.98, e.clientY / rect.height - dragOffsetRef.current.dy))
-      const updated = textOverlays.map((t, i) => i === draggingTextIdx ? { ...t, x, y } : t)
-      setTextOverlays(updated)
-      endTextDrag(updated)
-      return
-    }
-    setDragging(false)
-  }
+  function handleMouseUp() { setDragging(false) }
 
   function handleTouchStart(e: React.TouchEvent) {
-    if (draggingTextIdx !== null) return
-    if (!withLogo || e.touches.length !== 1) return
+    if (draggingTextRef.current || !withLogo || e.touches.length !== 1) return
     setDragging(true)
     updateLogoPos(e.touches[0].clientX, e.touches[0].clientY)
   }
   function handleTouchMove(e: React.TouchEvent) {
-    if (e.touches.length !== 1) return
-    if (draggingTextIdx !== null) { e.preventDefault(); moveTextDrag(e.touches[0].clientX, e.touches[0].clientY); return }
-    if (dragging) { e.preventDefault(); updateLogoPos(e.touches[0].clientX, e.touches[0].clientY) }
+    if (!dragging || e.touches.length !== 1) return
+    e.preventDefault()
+    updateLogoPos(e.touches[0].clientX, e.touches[0].clientY)
   }
-  function handleTouchEnd() {
-    if (draggingTextIdx !== null) { endTextDrag(); return }
-    setDragging(false)
-  }
+  function handleTouchEnd() { setDragging(false) }
 
   async function handleDownload(url: string) {
     const filename = `ai-design-${Date.now()}.jpg`
+    // Ensure we always download a data URL so the browser triggers a file save
+    let dataUrl = url
+    if (!url.startsWith('data:')) {
+      dataUrl = await urlToDataUrl(url)
+    }
     const a = document.createElement('a')
-    a.href = url
+    a.href = dataUrl
     a.download = filename
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     try {
-      const dataUrl = await urlToDataUrl(url)
       saveToGallery({ dataUrl, filename, source: 'image-design' })
     } catch (e) {
       console.error('Gallery save failed', e)
@@ -340,9 +349,9 @@ export default function ImageDesignStudio() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
+    <div className="h-screen flex flex-col bg-zinc-900 text-white overflow-hidden">
       {/* Header */}
-      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
+      <header className="border-b border-zinc-800 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <Logo />
           <div>
@@ -372,7 +381,7 @@ export default function ImageDesignStudio() {
       </header>
 
       {/* Nav */}
-      <nav className="border-b border-zinc-800 px-6 flex gap-1">
+      <nav className="border-b border-zinc-800 px-6 flex gap-1 flex-shrink-0">
         {[
           { label: '运营日历', href: '/calendar', icon: '📅' },
           { label: '模板社区', href: '/templates', icon: '🎨' },
@@ -396,11 +405,11 @@ export default function ImageDesignStudio() {
       </nav>
 
       {/* Main */}
-      <main className="max-w-7xl mx-auto px-6 py-8 flex gap-6">
+      <main className="flex-1 w-full px-6 py-4 flex gap-6 overflow-hidden">
         {/* Left panel */}
-        <div className="w-80 flex-shrink-0 flex flex-col gap-4">
+        <div className="w-80 flex-shrink-0 flex flex-col gap-3 overflow-y-auto">
           {/* Prompt */}
-          <div className="bg-zinc-800/50 rounded-2xl p-5 ring-2 ring-indigo-500/60">
+          <div className="bg-zinc-800/50 rounded-2xl p-4 ring-2 ring-indigo-500/60">
             <label className="block text-sm font-semibold text-indigo-300 mb-2 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
               提示词 <span className="text-indigo-400 font-normal text-xs">（从这里开始）</span>
@@ -409,13 +418,13 @@ export default function ImageDesignStudio() {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder="描述你想生成的图片内容，例如：一只可爱的橘猫坐在窗台上，阳光照射，背景是城市街景..."
-              rows={5}
+              rows={4}
               className="w-full bg-zinc-700/80 border-2 border-indigo-500/50 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-400 resize-none focus:outline-none focus:border-indigo-400 transition-colors"
             />
           </div>
 
           {/* Style */}
-          <div className="bg-zinc-800/50 rounded-2xl p-5">
+          <div className="bg-zinc-800/50 rounded-2xl p-4">
             <label className="block text-sm font-medium text-zinc-300 mb-3">风格</label>
             <div className="flex flex-wrap gap-2">
               {STYLE_OPTIONS.map(s => (
@@ -435,8 +444,8 @@ export default function ImageDesignStudio() {
           </div>
 
           {/* Ratio */}
-          <div className="bg-zinc-800/50 rounded-2xl p-5">
-            <label className="block text-sm font-medium text-zinc-300 mb-3">图片比例</label>
+          <div className="bg-zinc-800/50 rounded-2xl p-4">
+            <label className="block text-sm font-medium text-zinc-300 mb-2">图片比例</label>
             <div className="flex flex-wrap gap-2">
               {RATIO_OPTIONS.map(r => (
                 <button
@@ -464,7 +473,7 @@ export default function ImageDesignStudio() {
           </div>
 
           {/* Count */}
-          <div className="bg-zinc-800/50 rounded-2xl p-5">
+          <div className="bg-zinc-800/50 rounded-2xl p-4">
             <label className="block text-sm font-medium text-zinc-300 mb-3">生成数量</label>
             <div className="flex gap-2">
               {COUNT_OPTIONS.map(n => (
@@ -502,11 +511,11 @@ export default function ImageDesignStudio() {
         </div>
 
         {/* Right panel: results */}
-        <div className="flex-1 flex flex-col gap-4">
+        <div className="flex-1 flex flex-col gap-3 min-h-0">
           <canvas ref={canvasRef} className="hidden" />
 
           {/* Main preview */}
-          <div className="bg-zinc-800/50 rounded-2xl flex-1 overflow-hidden min-h-[480px] relative flex items-center justify-center">
+          <div className="bg-zinc-800/50 rounded-2xl flex-1 min-h-0 overflow-hidden relative flex items-center justify-center p-3">
             {generating ? (
               <div className="flex flex-col items-center gap-4 text-zinc-400">
                 <div className="relative w-16 h-16">
@@ -519,8 +528,16 @@ export default function ImageDesignStudio() {
             ) : selectedImage ? (
               <div
                 ref={previewAreaRef}
-                className="w-full h-full relative flex items-center justify-center select-none"
-                style={{ cursor: draggingTextIdx !== null ? 'grabbing' : withLogo ? 'move' : 'default' }}
+                className="relative select-none"
+                style={(() => {
+                  const r = RATIO_OPTIONS.find(r => r.value === ratio)
+                  const isPortrait = r && r.h > r.w
+                  return {
+                    aspectRatio: r ? `${r.w}/${r.h}` : '1/1',
+                    ...(isPortrait ? { height: '100%', maxHeight: '100%' } : { width: '100%', maxWidth: '100%' }),
+                    cursor: withLogo && !draggingTextRef.current ? 'move' : 'default',
+                  }
+                })()}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -528,66 +545,70 @@ export default function ImageDesignStudio() {
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onClick={() => setSelectedTextIdx(null)}
               >
                 <img
                   src={compositedUrl ?? selectedImage}
                   alt="Generated"
-                  className="max-w-full max-h-full object-contain rounded-xl"
+                  className="w-full h-full object-contain rounded-xl"
                   draggable={false}
                 />
 
-                {/* 实时文字 HTML overlay（编辑中 + 已确认的文字） */}
-                {(() => {
-                  const el = previewAreaRef.current
-                  if (!el) return null
-                  const rect = el.getBoundingClientRect()
-                  // 找到图片实际渲染尺寸
-                  const imgEl = el.querySelector('img') as HTMLImageElement | null
-                  if (!imgEl) return null
-                  const iRect = imgEl.getBoundingClientRect()
-                  const iW = iRect.width
-                  const iH = iRect.height
-                  const iLeft = iRect.left - rect.left
-                  const iTop  = iRect.top  - rect.top
-
-                  const allTexts: (TextOverlay & { isPreview?: boolean })[] = [
-                    ...textOverlays,
-                    ...(showTextEditor && editingText.content ? [{ ...editingText, isPreview: true }] : []),
+                {/* 文字 HTML overlay — 只在没有 compositedUrl 时显示（避免重复） */}
+                {!compositedUrl && (() => {
+                  const allTexts = [
+                    ...textOverlays.map((t, i) => ({ t, i, isPreview: false })),
+                    ...(showTextEditor && editingText.content
+                      ? [{ t: editingText, i: -1, isPreview: true }]
+                      : []),
                   ]
-
-                  return allTexts.map((t, i) => {
-                    const isPreview = (t as any).isPreview
-                    const isBeingDragged = draggingTextIdx === i
-                    const px = iLeft + iW * t.x
-                    const py = iTop  + iH * t.y
-                    const fs = Math.max(12, Math.round(iW * t.fontSize))
+                  return allTexts.map(({ t, i, isPreview }) => {
+                    const isSelected = !isPreview && selectedTextIdx === i
+                    // 字号：基于容器宽度的百分比，转换为 vw 单位
+                    const fontSizeVw = t.fontSize * 100 * 0.5 // 0.5 是调整系数，让字号更合理
                     return (
                       <div
-                        key={i}
-                        className={`absolute pointer-events-auto whitespace-nowrap font-bold transition-opacity ${isPreview ? 'opacity-70' : 'opacity-100'}`}
+                        key={isPreview ? 'preview' : i}
+                        className="absolute whitespace-nowrap font-bold"
                         style={{
-                          left: px,
-                          top: py,
+                          left: `${t.x * 100}%`,
+                          top: `${t.y * 100}%`,
                           transform: 'translate(-50%, -50%)',
-                          fontSize: fs,
+                          fontSize: `max(14px, ${fontSizeVw}vw)`,
                           color: t.color,
                           fontFamily: t.fontFamily,
                           textShadow: t.color === '#000000'
-                            ? '0 0 4px #fff, 0 0 4px #fff'
-                            : '0 0 6px rgba(0,0,0,0.8), 1px 1px 3px rgba(0,0,0,0.9)',
-                          cursor: isPreview ? 'default' : isBeingDragged ? 'grabbing' : 'grab',
-                          outline: isBeingDragged ? '2px dashed rgba(255,255,255,0.8)' : 'none',
-                          outlineOffset: 4,
+                            ? '0 0 4px #fff, 0 0 6px #fff'
+                            : '0 1px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.7)',
+                          opacity: isPreview ? 0.6 : 1,
+                          cursor: isPreview ? 'default' : isSelected ? 'grab' : 'pointer',
                           userSelect: 'none',
+                          padding: '4px 8px',
+                          border: isSelected
+                            ? '2px dashed rgba(255,255,255,0.9)'
+                            : '2px dashed transparent',
+                          borderRadius: 4,
+                          boxShadow: isSelected ? '0 0 0 1px rgba(0,0,0,0.4)' : 'none',
+                          pointerEvents: isPreview ? 'none' : 'auto',
                         }}
-                        onMouseDown={isPreview ? undefined : e => startTextDrag(e, i)}
-                        onTouchStart={isPreview ? undefined : e => startTextDrag(e, i)}
+                        onMouseDown={isPreview ? undefined : e => {
+                          e.stopPropagation()
+                          setSelectedTextIdx(i)
+                          startTextDrag(e, i)
+                        }}
+                        onTouchStart={isPreview ? undefined : e => {
+                          e.stopPropagation()
+                          setSelectedTextIdx(i)
+                          startTextDrag(e, i)
+                        }}
+                        onClick={e => e.stopPropagation()}
                       >
                         {t.content}
-                        {!isPreview && (
+                        {isSelected && (
                           <button
-                            className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                            style={{ fontSize: 10 }}
+                            className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-red-500 hover:bg-red-400 text-white flex items-center justify-center shadow-lg"
+                            style={{ fontSize: 11, lineHeight: 1 }}
+                            onMouseDown={e => e.stopPropagation()}
                             onClick={e => { e.stopPropagation(); handleRemoveText(i) }}
                           >✕</button>
                         )}
@@ -638,9 +659,72 @@ export default function ImageDesignStudio() {
 
           {/* 操作栏：文字 + Logo + 下载 */}
           {selectedImage && !generating && (
-            <div className="flex flex-col gap-2">
-              {/* 文字编辑面板 */}
-              {showTextEditor && (
+            <div className="flex flex-col gap-2 overflow-y-auto max-h-64">
+
+              {/* 选中文字时：编辑面板 */}
+              {selectedTextIdx !== null && textOverlays[selectedTextIdx] && (() => {
+                const t = textOverlays[selectedTextIdx]
+                const update = (patch: Partial<TextOverlay>) => {
+                  const updated = textOverlays.map((o, i) => i === selectedTextIdx ? { ...o, ...patch } : o)
+                  setTextOverlays(updated)
+                  redrawCanvas(updated)
+                }
+                return (
+                  <div className="bg-zinc-800 border border-indigo-500/60 rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-indigo-300">编辑文字</span>
+                      <button onClick={() => setSelectedTextIdx(null)} className="text-zinc-500 hover:text-zinc-300 text-xs">完成</button>
+                    </div>
+                    <input
+                      type="text"
+                      value={t.content}
+                      onChange={e => update({ content: e.target.value })}
+                      className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                      autoFocus
+                    />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-10">字号</span>
+                        <div className="flex gap-1 flex-1">
+                          {FONT_SIZES.map((fs, i) => (
+                            <button key={fs} onClick={() => update({ fontSize: fs })}
+                              className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${t.fontSize === fs ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}>
+                              {FONT_SIZE_LABELS[i]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-10">字体</span>
+                        <select value={t.fontFamily} onChange={e => update({ fontFamily: e.target.value })}
+                          className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                          style={{ fontFamily: t.fontFamily }}>
+                          {TEXT_FONTS.map(f => (
+                            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}　{f.preview}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-zinc-400 w-10">颜色</span>
+                        <div className="flex gap-1.5 flex-1">
+                          {TEXT_COLORS.map(c => (
+                            <button key={c} onClick={() => update({ color: c })}
+                              className={`w-6 h-6 rounded-full border-2 transition-all ${t.color === c ? 'border-indigo-400 scale-110' : 'border-zinc-600'}`}
+                              style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={() => { handleRemoveText(selectedTextIdx); setSelectedTextIdx(null) }}
+                      className="py-1.5 bg-red-600/30 hover:bg-red-600/50 text-red-300 text-sm rounded-lg transition-colors">
+                      删除此文字
+                    </button>
+                  </div>
+                )
+              })()}
+
+              {/* 新增文字面板 */}
+              {showTextEditor && selectedTextIdx === null && (
                 <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-4 flex flex-col gap-3">
                   <input
                     type="text"
@@ -652,63 +736,45 @@ export default function ImageDesignStudio() {
                     onKeyDown={e => { if (e.key === 'Enter') handleApplyText() }}
                   />
                   <div className="flex flex-col gap-2">
-                    {/* 字号 */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-zinc-400 w-10">字号</span>
                       <div className="flex gap-1 flex-1">
                         {FONT_SIZES.map((fs, i) => (
-                          <button
-                            key={fs}
-                            onClick={() => setEditingText(prev => ({ ...prev, fontSize: fs }))}
-                            className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${editingText.fontSize === fs ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                          >
+                          <button key={fs} onClick={() => setEditingText(prev => ({ ...prev, fontSize: fs }))}
+                            className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${editingText.fontSize === fs ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}>
                             {FONT_SIZE_LABELS[i]}
                           </button>
                         ))}
                       </div>
                     </div>
-                    {/* 字体 */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-zinc-400 w-10">字体</span>
-                      <div className="flex gap-1 flex-1">
+                      <select value={editingText.fontFamily} onChange={e => setEditingText(prev => ({ ...prev, fontFamily: e.target.value }))}
+                        className="flex-1 bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+                        style={{ fontFamily: editingText.fontFamily }}>
                         {TEXT_FONTS.map(f => (
-                          <button
-                            key={f.value}
-                            onClick={() => setEditingText(prev => ({ ...prev, fontFamily: f.value }))}
-                            className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${editingText.fontFamily === f.value ? 'bg-indigo-600 text-white' : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'}`}
-                          >
-                            {f.label}
-                          </button>
+                          <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}　{f.preview}</option>
                         ))}
-                      </div>
+                      </select>
                     </div>
-                    {/* 颜色 */}
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-zinc-400 w-10">颜色</span>
                       <div className="flex gap-1.5 flex-1">
                         {TEXT_COLORS.map(c => (
-                          <button
-                            key={c}
-                            onClick={() => setEditingText(prev => ({ ...prev, color: c }))}
+                          <button key={c} onClick={() => setEditingText(prev => ({ ...prev, color: c }))}
                             className={`w-6 h-6 rounded-full border-2 transition-all ${editingText.color === c ? 'border-indigo-400 scale-110' : 'border-zinc-600'}`}
-                            style={{ backgroundColor: c }}
-                          />
+                            style={{ backgroundColor: c }} />
                         ))}
                       </div>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowTextEditor(false)}
-                      className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm rounded-lg transition-colors"
-                    >
+                    <button onClick={() => setShowTextEditor(false)}
+                      className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm rounded-lg transition-colors">
                       取消
                     </button>
-                    <button
-                      onClick={handleApplyText}
-                      disabled={!editingText.content.trim()}
-                      className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
+                    <button onClick={handleApplyText} disabled={!editingText.content.trim()}
+                      className="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
                       添加文字
                     </button>
                   </div>
@@ -716,10 +782,9 @@ export default function ImageDesignStudio() {
               )}
 
               <div className="flex gap-2">
-                {/* 添加文字按钮 */}
                 <button
-                  onClick={() => setShowTextEditor(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${showTextEditor ? 'bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`}
+                  onClick={() => { setShowTextEditor(v => !v); setSelectedTextIdx(null) }}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${showTextEditor && selectedTextIdx === null ? 'bg-indigo-700 text-white' : 'bg-zinc-700 hover:bg-zinc-600 text-white'}`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -727,23 +792,16 @@ export default function ImageDesignStudio() {
                   添加文字
                 </button>
 
-                {/* Logo 按钮 */}
                 {!withLogo ? (
-                  <button
-                    onClick={handleAddLogo}
-                    disabled={compositing}
-                    className="flex items-center gap-2 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
+                  <button onClick={handleAddLogo} disabled={compositing}
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
                     {compositing
                       ? <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />处理中...</>
-                      : <><img src="/bigoffs-logo.png" alt="" className="h-4 w-auto" />添加 Logo</>
-                    }
+                      : <><img src="/bigoffs-logo.png" alt="" className="h-4 w-auto" />添加 Logo</>}
                   </button>
                 ) : (
-                  <button
-                    onClick={handleRemoveLogo}
-                    className="px-3 py-2 bg-zinc-600 hover:bg-zinc-500 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
+                  <button onClick={handleRemoveLogo}
+                    className="px-3 py-2 bg-zinc-600 hover:bg-zinc-500 text-white text-sm font-medium rounded-lg transition-colors">
                     ✕ 移除 Logo
                   </button>
                 )}

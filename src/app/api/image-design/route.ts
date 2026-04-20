@@ -8,87 +8,50 @@ const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
 })
 
-type ContentPart = { type: 'image_url'; image_url: { url: string } } | { type: 'text'; text: string }
-
-async function generateImage(parts: ContentPart[], model: string): Promise<string | null> {
-  const response = await client.chat.completions.create({
-    model,
-    messages: [{ role: 'user', content: parts as OpenAI.Chat.ChatCompletionContentPart[] }],
-  })
-  const msg = response.choices[0]?.message as unknown as Record<string, unknown>
-  const images = msg?.images as Array<{ image_url: { url: string } }> | undefined
-  return images?.[0]?.image_url?.url ?? null
-}
-
-interface TextOverlay {
-  content: string
-  fontSize: number
-  color: string
-  fontFamily: string
-  x: number
-  y: number
-}
-
-function extractTexts(prompt: string): TextOverlay[] {
-  const texts: TextOverlay[] = []
-  const defaultFont = '"PingFang SC", "Microsoft YaHei", sans-serif'
-
-  const quotedRe = /["""''']([^"""''']{1,30})["""''']/g
-  let m: RegExpExecArray | null
-  while ((m = quotedRe.exec(prompt)) !== null) {
-    texts.push({ content: m[1], fontSize: 0.07, color: '#ffffff', fontFamily: defaultFont, x: 0.5, y: 0.5 })
+async function generateImage(prompt: string, aspectRatio: string): Promise<string | null> {
+  const params = {
+    model: 'google/gemini-2.5-flash-image',
+    messages: [{ role: 'user' as const, content: prompt }],
+    modalities: ['image', 'text'],
+    image_config: { aspect_ratio: aspectRatio },
   }
-
-  const explicitRe = /(?:写上|写着|文字[：:]\s*|标题[：:]\s*|slogan[：:]\s*)([^\s，,。.！!？?]{1,30})/gi
-  while ((m = explicitRe.exec(prompt)) !== null) {
-    const content = m[1].trim()
-    if (!texts.find(t => t.content === content)) {
-      texts.push({ content, fontSize: 0.07, color: '#ffffff', fontFamily: defaultFont, x: 0.5, y: 0.5 })
-    }
+  const response = await (client.chat.completions.create as (p: unknown) => Promise<unknown>)(params)
+  const msg = (response as Record<string, unknown>)
+  const choices = msg?.choices as Array<{ message: Record<string, unknown> }> | undefined
+  const message = choices?.[0]?.message
+  const images = message?.images as Array<{ image_url: { url: string } }> | undefined
+  const url = images?.[0]?.image_url?.url ?? null
+  if (!url || url.startsWith('data:')) return url
+  try {
+    const res = await fetch(url)
+    const buf = await res.arrayBuffer()
+    const mime = res.headers.get('content-type') ?? 'image/jpeg'
+    const b64 = Buffer.from(buf).toString('base64')
+    return `data:${mime};base64,${b64}`
+  } catch {
+    return url
   }
-
-  return texts
 }
 
 export async function POST(req: NextRequest) {
-  const { prompt, negativePrompt, style, ratio, count, steps, cfgScale, seed, sampler } = await req.json()
+  const { prompt, style, ratio, count } = await req.json()
 
   if (!prompt) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 })
   }
 
-  const [width, height] = ratio === '1:1' ? [1024, 1024] : ratio === '16:9' ? [1344, 768] : ratio === '9:16' ? [768, 1344] : [1024, 1024]
-
   const stylePrompts: Record<string, string> = {
-    realistic: 'photorealistic, high quality, detailed, professional photography',
-    anime: 'anime style, vibrant colors, detailed illustration, manga art',
-    '3d': '3D render, octane render, unreal engine, high quality CGI',
-    oil: 'oil painting, artistic, textured brushstrokes, classical art style',
+    realistic:  'photorealistic, high quality, detailed, professional photography',
+    anime:      'anime style, vibrant colors, detailed illustration, manga art',
+    '3d':       '3D render, octane render, unreal engine, high quality CGI',
+    oil:        'oil painting, artistic, textured brushstrokes, classical art style',
     watercolor: 'watercolor painting, soft colors, artistic, flowing paint',
   }
 
-  const texts = extractTexts(prompt)
-
-  const fullPrompt = `${prompt}. ${stylePrompts[style] || stylePrompts.realistic}. Image dimensions: ${width}x${height}. IMPORTANT: Do NOT render any text, letters, words, or typography in the image — leave any text areas as clean background.`
-  const finalPrompt = negativePrompt
-    ? `${fullPrompt}\n\nAvoid: ${negativePrompt}`
-    : fullPrompt
-
-  const seedInfo = seed ? `Use seed: ${seed}` : ''
-  const samplerInfo = sampler ? `Sampler: ${sampler}` : ''
-  const stepsInfo = steps ? `Steps: ${steps}` : ''
-  const cfgInfo = cfgScale ? `CFG Scale: ${cfgScale}` : ''
-
-  const technicalParams = [seedInfo, samplerInfo, stepsInfo, cfgInfo].filter(Boolean).join(', ')
-  const promptWithParams = technicalParams ? `${finalPrompt}\n\nTechnical parameters: ${technicalParams}` : finalPrompt
+  const fullPrompt = `${prompt}. Style: ${stylePrompts[style] || stylePrompts.realistic}. Fill the entire canvas edge to edge, no blank areas, no borders. Do NOT render any text or typography in the image.`
 
   const results = await Promise.allSettled(
-    Array.from({ length: count }, () =>
-      generateImage(
-        [{ type: 'text', text: promptWithParams }],
-        'google/gemini-2.5-flash-image'
-      )
-    )
+    Array.from({ length: count }, () => generateImage(fullPrompt, ratio ?? '1:1'))
   )
 
   const images = results
@@ -98,5 +61,5 @@ export async function POST(req: NextRequest) {
     }))
     .filter(img => img.url !== null)
 
-  return NextResponse.json({ images, texts })
+  return NextResponse.json({ images, texts: [] })
 }
